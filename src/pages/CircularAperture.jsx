@@ -1,0 +1,97 @@
+import { useState, useMemo, useCallback } from 'react';
+import ControlPanel from '../components/ControlPanel';
+import Slider from '../components/Slider';
+import IntensityPlot from '../components/IntensityPlot';
+import AiryDisk2D from '../components/AiryDisk2D';
+import Readout from '../components/Readout';
+import InfoPanel from '../components/InfoPanel';
+import { airyIntensity } from '../lib/physics';
+import { makeTrace } from '../lib/plotly';
+
+const DEFAULTS = { D: 1.0, lambda: 550, L: 2.0 };
+
+export default function CircularAperture() {
+  const [D, setD] = useState(DEFAULTS.D);
+  const [lambda, setLambda] = useState(DEFAULTS.lambda);
+  const [L, setL] = useState(DEFAULTS.L);
+
+  const reset = () => { setD(DEFAULTS.D); setLambda(DEFAULTS.lambda); setL(DEFAULTS.L); };
+
+  const D_m = D * 1e-3;
+  const lambda_m = lambda * 1e-9;
+
+  const r1 = (1.22 * lambda_m * L) / D_m;
+  const theta1 = (1.22 * lambda_m) / D_m;
+
+  const rMax = 4 * r1;
+  const nPts = 2000;
+
+  const { xData, yData } = useMemo(() => {
+    const xs = [];
+    const ys = [];
+    for (let i = 0; i < nPts; i++) {
+      const r = -rMax + (2 * rMax * i) / (nPts - 1);
+      xs.push(r * 1e3); // mm
+      ys.push(airyIntensity(r, D_m, lambda_m, L));
+    }
+    return { xData: xs, yData: ys };
+  }, [D_m, lambda_m, L, rMax]);
+
+  const traces = useMemo(() => [makeTrace(xData, yData, lambda)], [xData, yData, lambda]);
+
+  const shapes = useMemo(() => {
+    const pos = r1 * 1e3;
+    return [1, -1].map(sign => ({
+      type: 'line',
+      x0: sign * pos, x1: sign * pos,
+      y0: 0, y1: 1.05,
+      line: { color: '#C5B783', width: 1, dash: 'dash' },
+    }));
+  }, [r1]);
+
+  const intensityFn2D = useCallback(
+    (r) => airyIntensity(r, D_m, lambda_m, L),
+    [D_m, lambda_m, L]
+  );
+
+  return (
+    <div className="flex flex-col lg:flex-row gap-6">
+      <ControlPanel onReset={reset}>
+        <Slider label="Aperture diameter (D)" value={D} min={0.05} max={5.0} step={0.05} unit="mm" onChange={setD} />
+        <Slider label="Wavelength (λ)" value={lambda} min={380} max={780} step={1} unit="nm" onChange={setLambda} />
+        <Slider label="Screen distance (L)" value={L} min={0.5} max={10.0} step={0.1} unit="m" onChange={setL} />
+        <div className="mt-4 space-y-1">
+          <Readout label="First ring angle θ₁" value={(theta1 * 1e3).toFixed(3)} unit="mrad" />
+          <Readout label="First ring radius r₁" value={(r1 * 1e3).toFixed(2)} unit="mm" />
+        </div>
+      </ControlPanel>
+
+      <div className="flex-1 flex flex-col gap-4">
+        <div className="bg-usna-card border border-usna-grid rounded-lg p-4" style={{ height: 380 }}>
+          <IntensityPlot
+            traces={traces}
+            layoutOverrides={{
+              xaxis: { title: { text: 'Radial Position r (mm)' } },
+              shapes,
+            }}
+          />
+        </div>
+
+        <div className="flex justify-center">
+          <AiryDisk2D
+            intensityFn={intensityFn2D}
+            rMax={rMax}
+            wavelengthNm={lambda}
+            size={400}
+          />
+        </div>
+
+        <InfoPanel
+          title="Circular Aperture — Airy Pattern"
+          description="Diffraction through a circular aperture produces the Airy pattern: a bright central disk surrounded by concentric dark and bright rings. The first dark ring defines the angular resolution limit."
+          equation={String.raw`I(\theta) = I_0 \left[\frac{2\,J_1(u)}{u}\right]^2, \quad u = \frac{\pi D \sin\theta}{\lambda}`}
+        />
+      </div>
+    </div>
+  );
+}
