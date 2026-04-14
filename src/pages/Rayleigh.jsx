@@ -15,6 +15,7 @@ const DEFAULTS = {
   D: 2.0, lambda: 550, sepRatio: 1.0,
   R: 1000, s: 0.5,
 };
+const INITIAL_RANGE = 6 * (1.22 * DEFAULTS.lambda * 1e-9 * 2.0) / (DEFAULTS.D * 1e-3);
 
 export default function Rayleigh() {
   const [D, setD] = useState(DEFAULTS.D);
@@ -26,10 +27,10 @@ export default function Rayleigh() {
   const [R, setR] = useState(DEFAULTS.R);      // distance to sources, meters
   const [s, setS] = useState(DEFAULTS.s);       // separation between sources, meters
 
-  const [lockAxis, setLockAxis] = useState(false);
+  const [lockAxis, setLockAxis] = useState(true);
   const [logScale, setLogScale] = useState(false);
   const [gamma, setGamma] = useState(0.5);
-  const lockedRange = useRef(null);
+  const lockedRange = useRef(INITIAL_RANGE);
 
   const reset = () => {
     setD(DEFAULTS.D); setLambda(DEFAULTS.lambda);
@@ -131,36 +132,39 @@ export default function Rayleigh() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = setupCanvas(canvas, size, size);
-    const { r: cr, g: cg, b: cb } = wavelengthToRGB(lambda);
-    const dpr = window.devicePixelRatio || 1;
-    const pxSize = Math.round(size * dpr);
-    const imageData = ctx.createImageData(pxSize, pxSize);
-    const data = imageData.data;
-    const half = pxSize / 2;
+    const timer = setTimeout(() => {
+      const ctx = setupCanvas(canvas, size, size);
+      const { r: cr, g: cg, b: cb } = wavelengthToRGB(lambda);
+      const dpr = window.devicePixelRatio || 1;
+      const pxSize = Math.round(size * dpr);
+      const imageData = ctx.createImageData(pxSize, pxSize);
+      const data = imageData.data;
+      const half = pxSize / 2;
 
-    for (let py = 0; py < pxSize; py++) {
-      for (let px = 0; px < pxSize; px++) {
-        const xPhys = ((px - half) / half) * rMax;
-        const yPhys = ((py - half) / half) * rMax;
-        const r1d = Math.sqrt((xPhys - sep / 2) ** 2 + yPhys ** 2);
-        const r2d = Math.sqrt((xPhys + sep / 2) ** 2 + yPhys ** 2);
-        const i1 = airyIntensity(r1d, D_m, lambda_m, L);
-        const i2 = airyIntensity(r2d, D_m, lambda_m, L);
-        const raw = Math.min(1, (i1 + i2) / 2);
-        const I = Math.pow(raw, gamma);
+      for (let py = 0; py < pxSize; py++) {
+        for (let px = 0; px < pxSize; px++) {
+          const xPhys = ((px - half) / half) * rMax;
+          const yPhys = ((py - half) / half) * rMax;
+          const r1d = Math.sqrt((xPhys - sep / 2) ** 2 + yPhys ** 2);
+          const r2d = Math.sqrt((xPhys + sep / 2) ** 2 + yPhys ** 2);
+          const i1 = airyIntensity(r1d, D_m, lambda_m, L);
+          const i2 = airyIntensity(r2d, D_m, lambda_m, L);
+          const raw = Math.min(1, i1 + i2);
+          const I = Math.pow(raw, gamma);
 
-        const rNorm = Math.sqrt(((px - half) / half) ** 2 + ((py - half) / half) ** 2);
-        const visible = rNorm <= 1.0;
+          const rNorm = Math.sqrt(((px - half) / half) ** 2 + ((py - half) / half) ** 2);
+          const visible = rNorm <= 1.0;
 
-        const idx = (py * pxSize + px) * 4;
-        data[idx] = visible ? Math.round(cr * I) : 0;
-        data[idx + 1] = visible ? Math.round(cg * I) : 0;
-        data[idx + 2] = visible ? Math.round(cb * I) : 0;
-        data[idx + 3] = 255;
+          const idx = (py * pxSize + px) * 4;
+          data[idx] = visible ? Math.round(cr * I) : 0;
+          data[idx + 1] = visible ? Math.round(cg * I) : 0;
+          data[idx + 2] = visible ? Math.round(cb * I) : 0;
+          data[idx + 3] = 255;
+        }
       }
-    }
-    ctx.putImageData(imageData, 0, 0);
+      ctx.putImageData(imageData, 0, 0);
+    }, 30);
+    return () => clearTimeout(timer);
   }, [D_m, lambda_m, L, sep, lambda, rMax, gamma]);
 
   return (

@@ -10,15 +10,16 @@ import { airyIntensity } from '../lib/physics';
 import { makeTrace } from '../lib/plotly';
 
 const DEFAULTS = { D: 1.0, lambda: 550, L: 2.0 };
+const INITIAL_RANGE = 4 * (1.22 * DEFAULTS.lambda * 1e-9 * DEFAULTS.L) / (DEFAULTS.D * 1e-3);
 
 export default function CircularAperture() {
   const [D, setD] = useState(DEFAULTS.D);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
   const [L, setL] = useState(DEFAULTS.L);
-  const [lockAxis, setLockAxis] = useState(false);
+  const [lockAxis, setLockAxis] = useState(true);
   const [logScale, setLogScale] = useState(false);
   const [gamma, setGamma] = useState(0.5);
-  const lockedRange = useRef(null);
+  const lockedRange = useRef(INITIAL_RANGE);
 
   const reset = () => { setD(DEFAULTS.D); setLambda(DEFAULTS.lambda); setL(DEFAULTS.L); };
 

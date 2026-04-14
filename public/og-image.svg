@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#001233"/>
+  <!-- Nav bar -->
+  <rect width="1200" height="56" fill="#00205B"/>
+  <text x="40" y="37" fill="#C5B783" font-family="Inter, system-ui, sans-serif" font-size="22" font-weight="600">Optical Diffraction Explorer</text>
+  <!-- Diffraction pattern visualization -->
+  <g transform="translate(600, 340)">
+    <!-- Central maximum -->
+    <rect x="-8" y="-180" width="16" height="180" fill="#C5B783" opacity="0.9" rx="2"/>
+    <!-- First order -->
+    <rect x="-80" y="-60" width="12" height="60" fill="#C5B783" opacity="0.5" rx="2"/>
+    <rect x="68" y="-60" width="12" height="60" fill="#C5B783" opacity="0.5" rx="2"/>
+    <!-- Second order -->
+    <rect x="-150" y="-30" width="10" height="30" fill="#C5B783" opacity="0.3" rx="2"/>
+    <rect x="140" y="-30" width="10" height="30" fill="#C5B783" opacity="0.3" rx="2"/>
+    <!-- Third order -->
+    <rect x="-215" y="-18" width="8" height="18" fill="#C5B783" opacity="0.2" rx="1"/>
+    <rect x="207" y="-18" width="8" height="18" fill="#C5B783" opacity="0.2" rx="1"/>
+    <!-- Baseline -->
+    <line x1="-300" y1="0" x2="300" y2="0" stroke="#2A3442" stroke-width="1"/>
+  </g>
+  <!-- Subtitle -->
+  <text x="600" y="480" fill="#F0ECE3" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="500" text-anchor="middle">Interactive Diffraction Visualizations</text>
+  <text x="600" y="520" fill="#8B8C8E" font-family="Inter, system-ui, sans-serif" font-size="18" text-anchor="middle">SP212 — USNA Physics Department</text>
+</svg>

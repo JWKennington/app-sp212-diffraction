@@ -10,15 +10,16 @@ import { doubleSlitIntensity, interferenceOnly, envelopeOnly } from '../lib/phys
 import { makeTrace } from '../lib/plotly';
 
 const DEFAULTS = { a: 0.08, d: 0.40, lambda: 550 };
+const INITIAL_RANGE = 4 * (DEFAULTS.lambda * 1e-9 * 2.0) / (DEFAULTS.a * 1e-3);
 
 export default function Comparison() {
   const [a, setA] = useState(DEFAULTS.a);
   const [d, setD] = useState(DEFAULTS.d);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
-  const [lockAxis, setLockAxis] = useState(false);
+  const [lockAxis, setLockAxis] = useState(true);
   const [logScale, setLogScale] = useState(false);
   const [gamma, setGamma] = useState(0.5);
-  const lockedRange = useRef(null);
+  const lockedRange = useRef(INITIAL_RANGE);
 
   const reset = () => { setA(DEFAULTS.a); setD(DEFAULTS.d); setLambda(DEFAULTS.lambda); };
 
@@ -156,7 +157,6 @@ export default function Comparison() {
           xRange={[-xMax, xMax]}
           wavelengthNm={lambda}
           gamma={gamma}
-          width={800}
           height={60}
         />
 

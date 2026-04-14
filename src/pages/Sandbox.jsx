@@ -9,16 +9,17 @@ import { nSlitIntensity } from '../lib/physics';
 import { makeTrace } from '../lib/plotly';
 
 const DEFAULTS = { N: 2, a: 0.08, d: 0.40, lambda: 550 };
+const INITIAL_RANGE = 4 * (DEFAULTS.lambda * 1e-9 * 2.0) / (DEFAULTS.a * 1e-3);
 
 export default function Sandbox() {
   const [N, setN] = useState(DEFAULTS.N);
   const [a, setA] = useState(DEFAULTS.a);
   const [d, setD] = useState(DEFAULTS.d);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
-  const [lockAxis, setLockAxis] = useState(false);
+  const [lockAxis, setLockAxis] = useState(true);
   const [logScale, setLogScale] = useState(false);
   const [gamma, setGamma] = useState(0.5);
-  const lockedRange = useRef(null);
+  const lockedRange = useRef(INITIAL_RANGE);
 
   const reset = () => { setN(DEFAULTS.N); setA(DEFAULTS.a); setD(DEFAULTS.d); setLambda(DEFAULTS.lambda); };
 
@@ -113,14 +114,13 @@ export default function Sandbox() {
           xRange={[-xMax, xMax]}
           wavelengthNm={lambda}
           gamma={gamma}
-          width={800}
           height={60}
         />
 
         <InfoPanel
           title="N-Slit Explorer"
           description={infoText}
-          equation={String.raw`I = \left[\frac{\sin\beta}{\beta}\right]^2 \frac{1}{N^2}\left[\frac{\sin(N\psi/2)}{\sin(\psi/2)}\right]^2`}
+          equation={String.raw`I = \left[\frac{\sin\beta}{\beta}\right]^2 \frac{1}{N^2}\left[\frac{\sin(N\psi)}{\sin\psi}\right]^2, \quad \beta = \frac{\pi a \sin\theta}{\lambda},\; \psi = \frac{\pi d \sin\theta}{\lambda}`}
         />
       </div>
     </div>
