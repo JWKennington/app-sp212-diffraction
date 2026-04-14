@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import ControlPanel from '../components/ControlPanel';
 import Slider from '../components/Slider';
+import DisplayOptions from '../components/DisplayOptions';
 import IntensityPlot from '../components/IntensityPlot';
 import AiryDisk2D from '../components/AiryDisk2D';
 import Readout from '../components/Readout';
@@ -14,6 +15,9 @@ export default function CircularAperture() {
   const [D, setD] = useState(DEFAULTS.D);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
   const [L, setL] = useState(DEFAULTS.L);
+  const [lockAxis, setLockAxis] = useState(false);
+  const [gamma, setGamma] = useState(1.0);
+  const lockedRange = useRef(null);
 
   const reset = () => { setD(DEFAULTS.D); setLambda(DEFAULTS.lambda); setL(DEFAULTS.L); };
 
@@ -23,19 +27,27 @@ export default function CircularAperture() {
   const r1 = (1.22 * lambda_m * L) / D_m;
   const theta1 = (1.22 * lambda_m) / D_m;
 
-  const rMax = 4 * r1;
+  const autoRMax = 4 * r1;
+
+  const handleLockAxis = (locked) => {
+    if (locked) lockedRange.current = autoRMax;
+    setLockAxis(locked);
+  };
+
+  const rMax = lockAxis && lockedRange.current ? lockedRange.current : autoRMax;
+  const dataRMax = Math.max(rMax, autoRMax);
   const nPts = 2000;
 
   const { xData, yData } = useMemo(() => {
     const xs = [];
     const ys = [];
     for (let i = 0; i < nPts; i++) {
-      const r = -rMax + (2 * rMax * i) / (nPts - 1);
-      xs.push(r * 1e3); // mm
+      const r = -dataRMax + (2 * dataRMax * i) / (nPts - 1);
+      xs.push(r * 1e3);
       ys.push(airyIntensity(r, D_m, lambda_m, L));
     }
     return { xData: xs, yData: ys };
-  }, [D_m, lambda_m, L, rMax]);
+  }, [D_m, lambda_m, L, dataRMax]);
 
   const traces = useMemo(() => [makeTrace(xData, yData, lambda)], [xData, yData, lambda]);
 
@@ -48,6 +60,10 @@ export default function CircularAperture() {
       line: { color: '#C5B783', width: 1, dash: 'dash' },
     }));
   }, [r1]);
+
+  const xAxisRange = lockAxis && lockedRange.current
+    ? [-lockedRange.current * 1e3, lockedRange.current * 1e3]
+    : undefined;
 
   const intensityFn2D = useCallback(
     (r) => airyIntensity(r, D_m, lambda_m, L),
@@ -64,6 +80,12 @@ export default function CircularAperture() {
           <Readout label="First ring angle θ₁" value={(theta1 * 1e3).toFixed(3)} unit="mrad" />
           <Readout label="First ring radius r₁" value={(r1 * 1e3).toFixed(2)} unit="mm" />
         </div>
+        <DisplayOptions
+          lockAxis={lockAxis}
+          onLockAxisChange={handleLockAxis}
+          gamma={gamma}
+          onGammaChange={setGamma}
+        />
       </ControlPanel>
 
       <div className="flex-1 flex flex-col gap-4">
@@ -71,7 +93,10 @@ export default function CircularAperture() {
           <IntensityPlot
             traces={traces}
             layoutOverrides={{
-              xaxis: { title: { text: 'Radial Position r (mm)' } },
+              xaxis: {
+                title: { text: 'Radial Position r (mm)' },
+                ...(xAxisRange && { range: xAxisRange }),
+              },
               shapes,
             }}
           />
@@ -82,6 +107,7 @@ export default function CircularAperture() {
             intensityFn={intensityFn2D}
             rMax={rMax}
             wavelengthNm={lambda}
+            gamma={gamma}
             size={400}
           />
         </div>

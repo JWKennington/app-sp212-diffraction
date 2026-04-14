@@ -4,15 +4,15 @@ import { setupCanvas, renderAiryDisk } from '../lib/canvas';
 /**
  * Canvas component that renders a 2D Airy disk pattern.
  */
-export default function AiryDisk2D({ intensityFn, rMax, wavelengthNm, size = 400 }) {
+export default function AiryDisk2D({ intensityFn, rMax, wavelengthNm, gamma = 1, size = 400 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = setupCanvas(canvas, size, size);
-    renderAiryDisk(ctx, size, intensityFn, rMax, wavelengthNm);
-  }, [intensityFn, rMax, wavelengthNm, size]);
+    renderAiryDisk(ctx, size, intensityFn, rMax, wavelengthNm, gamma);
+  }, [intensityFn, rMax, wavelengthNm, gamma, size]);
 
   return (
     <canvas

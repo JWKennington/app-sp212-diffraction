@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import ControlPanel from '../components/ControlPanel';
 import Slider from '../components/Slider';
+import DisplayOptions from '../components/DisplayOptions';
 import IntensityPlot from '../components/IntensityPlot';
 import ScreenStrip from '../components/ScreenStrip';
 import Readout from '../components/Readout';
@@ -14,6 +15,9 @@ export default function Comparison() {
   const [a, setA] = useState(DEFAULTS.a);
   const [d, setD] = useState(DEFAULTS.d);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
+  const [lockAxis, setLockAxis] = useState(false);
+  const [gamma, setGamma] = useState(1.0);
+  const lockedRange = useRef(null);
 
   const reset = () => { setA(DEFAULTS.a); setD(DEFAULTS.d); setLambda(DEFAULTS.lambda); };
 
@@ -25,9 +29,16 @@ export default function Comparison() {
   const dOverA = d / a;
   const fringesInCentral = Math.max(1, Math.round(2 * d / a - 1));
 
-  // X-range: ~4 single-slit minima
   const y1 = (lambda_m * L) / a_m;
-  const xMax = 4 * y1;
+  const autoXMax = 4 * y1;
+
+  const handleLockAxis = (locked) => {
+    if (locked) lockedRange.current = autoXMax;
+    setLockAxis(locked);
+  };
+
+  const xMax = lockAxis && lockedRange.current ? lockedRange.current : autoXMax;
+  const dataXMax = Math.max(xMax, autoXMax);
   const nPts = 2000;
 
   const { xData, yInterf, yEnv, yCombined } = useMemo(() => {
@@ -36,14 +47,18 @@ export default function Comparison() {
     const env = [];
     const combined = [];
     for (let i = 0; i < nPts; i++) {
-      const y = -xMax + (2 * xMax * i) / (nPts - 1);
+      const y = -dataXMax + (2 * dataXMax * i) / (nPts - 1);
       xs.push(y * 1e3);
       interf.push(interferenceOnly(y, d_m, lambda_m, L));
       env.push(envelopeOnly(y, a_m, lambda_m, L));
       combined.push(doubleSlitIntensity(y, a_m, d_m, lambda_m, L));
     }
     return { xData: xs, yInterf: interf, yEnv: env, yCombined: combined };
-  }, [a_m, d_m, lambda_m, L, xMax]);
+  }, [a_m, d_m, lambda_m, L, dataXMax]);
+
+  const xAxisRange = lockAxis && lockedRange.current
+    ? [-lockedRange.current * 1e3, lockedRange.current * 1e3]
+    : undefined;
 
   const interfTraces = useMemo(() => [
     makeTrace(xData, yInterf, lambda, { fill: 'tozeroy' }),
@@ -55,7 +70,6 @@ export default function Comparison() {
 
   const combinedTraces = useMemo(() => [
     makeTrace(xData, yCombined, lambda, { fill: 'tozeroy' }),
-    // Diffraction envelope overlay
     {
       x: xData,
       y: yEnv,
@@ -83,39 +97,42 @@ export default function Comparison() {
           <Readout label="d/a ratio" value={dOverA.toFixed(1)} unit="" />
           <Readout label="Fringes in central max" value={fringesInCentral} unit="" />
         </div>
+        <DisplayOptions
+          lockAxis={lockAxis}
+          onLockAxisChange={handleLockAxis}
+          gamma={gamma}
+          onGammaChange={setGamma}
+        />
       </ControlPanel>
 
       <div className="flex-1 flex flex-col gap-4">
-        {/* Interference only */}
         <div className="bg-usna-card border border-usna-grid rounded-lg p-4" style={{ height: subplotHeight }}>
           <IntensityPlot
             traces={interfTraces}
             layoutOverrides={{
-              xaxis: { title: { text: '' } },
+              xaxis: { title: { text: '' }, ...(xAxisRange && { range: xAxisRange }) },
               yaxis: { title: { text: 'Interference' } },
               margin: { t: 10, b: 25 },
             }}
           />
         </div>
 
-        {/* Envelope only */}
         <div className="bg-usna-card border border-usna-grid rounded-lg p-4" style={{ height: subplotHeight }}>
           <IntensityPlot
             traces={envTraces}
             layoutOverrides={{
-              xaxis: { title: { text: '' } },
+              xaxis: { title: { text: '' }, ...(xAxisRange && { range: xAxisRange }) },
               yaxis: { title: { text: 'Envelope' } },
               margin: { t: 10, b: 25 },
             }}
           />
         </div>
 
-        {/* Combined */}
         <div className="bg-usna-card border border-usna-grid rounded-lg p-4" style={{ height: subplotHeight }}>
           <IntensityPlot
             traces={combinedTraces}
             layoutOverrides={{
-              xaxis: { title: { text: 'Screen Position y (mm)' } },
+              xaxis: { title: { text: 'Screen Position y (mm)' }, ...(xAxisRange && { range: xAxisRange }) },
               yaxis: { title: { text: 'Combined' } },
               margin: { t: 10, b: 40 },
             }}
@@ -126,6 +143,7 @@ export default function Comparison() {
           intensityFn={combinedIntensityFn}
           xRange={[-xMax, xMax]}
           wavelengthNm={lambda}
+          gamma={gamma}
           width={800}
           height={60}
         />

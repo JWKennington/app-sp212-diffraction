@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import ControlPanel from '../components/ControlPanel';
 import Slider from '../components/Slider';
+import DisplayOptions from '../components/DisplayOptions';
 import IntensityPlot from '../components/IntensityPlot';
 import ScreenStrip from '../components/ScreenStrip';
 import InfoPanel from '../components/InfoPanel';
-import { nSlitIntensity, singleSlitIntensity } from '../lib/physics';
+import { nSlitIntensity } from '../lib/physics';
 import { makeTrace } from '../lib/plotly';
 
 const DEFAULTS = { N: 2, a: 0.08, d: 0.40, lambda: 550 };
@@ -14,6 +15,9 @@ export default function Sandbox() {
   const [a, setA] = useState(DEFAULTS.a);
   const [d, setD] = useState(DEFAULTS.d);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
+  const [lockAxis, setLockAxis] = useState(false);
+  const [gamma, setGamma] = useState(1.0);
+  const lockedRange = useRef(null);
 
   const reset = () => { setN(DEFAULTS.N); setA(DEFAULTS.a); setD(DEFAULTS.d); setLambda(DEFAULTS.lambda); };
 
@@ -23,21 +27,33 @@ export default function Sandbox() {
   const L = 2.0;
 
   const y1 = (lambda_m * L) / a_m;
-  const xMax = 4 * y1;
+  const autoXMax = 4 * y1;
+
+  const handleLockAxis = (locked) => {
+    if (locked) lockedRange.current = autoXMax;
+    setLockAxis(locked);
+  };
+
+  const xMax = lockAxis && lockedRange.current ? lockedRange.current : autoXMax;
+  const dataXMax = Math.max(xMax, autoXMax);
   const nPts = 2000;
 
   const { xData, yData } = useMemo(() => {
     const xs = [];
     const ys = [];
     for (let i = 0; i < nPts; i++) {
-      const y = -xMax + (2 * xMax * i) / (nPts - 1);
+      const y = -dataXMax + (2 * dataXMax * i) / (nPts - 1);
       xs.push(y * 1e3);
       ys.push(nSlitIntensity(y, a_m, d_m, N, lambda_m, L));
     }
     return { xData: xs, yData: ys };
-  }, [a_m, d_m, N, lambda_m, L, xMax]);
+  }, [a_m, d_m, N, lambda_m, L, dataXMax]);
 
   const traces = useMemo(() => [makeTrace(xData, yData, lambda)], [xData, yData, lambda]);
+
+  const xAxisRange = lockAxis && lockedRange.current
+    ? [-lockedRange.current * 1e3, lockedRange.current * 1e3]
+    : undefined;
 
   const intensityFn = useCallback(
     (y) => nSlitIntensity(y, a_m, d_m, N, lambda_m, L),
@@ -59,6 +75,12 @@ export default function Sandbox() {
         <Slider label="Slit width (a)" value={a} min={0.01} max={0.50} step={0.01} unit="mm" onChange={setA} />
         <Slider label="Slit separation (d)" value={d} min={0.1} max={2.0} step={0.01} unit="mm" onChange={setD} />
         <Slider label="Wavelength (λ)" value={lambda} min={380} max={780} step={1} unit="nm" onChange={setLambda} />
+        <DisplayOptions
+          lockAxis={lockAxis}
+          onLockAxisChange={handleLockAxis}
+          gamma={gamma}
+          onGammaChange={setGamma}
+        />
       </ControlPanel>
 
       <div className="flex-1 flex flex-col gap-4">
@@ -66,7 +88,10 @@ export default function Sandbox() {
           <IntensityPlot
             traces={traces}
             layoutOverrides={{
-              xaxis: { title: { text: 'Screen Position y (mm)' } },
+              xaxis: {
+                title: { text: 'Screen Position y (mm)' },
+                ...(xAxisRange && { range: xAxisRange }),
+              },
             }}
           />
         </div>
@@ -75,6 +100,7 @@ export default function Sandbox() {
           intensityFn={intensityFn}
           xRange={[-xMax, xMax]}
           wavelengthNm={lambda}
+          gamma={gamma}
           width={800}
           height={60}
         />

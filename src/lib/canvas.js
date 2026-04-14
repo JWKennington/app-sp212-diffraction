@@ -27,8 +27,9 @@ export function setupCanvas(canvas, width, height) {
  * @param {function} intensityFn  (x) => intensity in [0,1], where x spans xRange
  * @param {[number, number]} xRange  [xMin, xMax] in same units as intensityFn expects
  * @param {number} wavelengthNm
+ * @param {number} [gamma=1]  display gamma — values < 1 boost dim features (e.g. 0.3 reveals secondary maxima)
  */
-export function renderScreenStrip(ctx, width, height, intensityFn, xRange, wavelengthNm) {
+export function renderScreenStrip(ctx, width, height, intensityFn, xRange, wavelengthNm, gamma = 1) {
   const { r, g, b } = wavelengthToRGB(wavelengthNm);
   const dpr = window.devicePixelRatio || 1;
   const imgWidth = Math.round(width * dpr);
@@ -39,7 +40,7 @@ export function renderScreenStrip(ctx, width, height, intensityFn, xRange, wavel
 
   for (let px = 0; px < imgWidth; px++) {
     const x = xMin + (px / (imgWidth - 1)) * (xMax - xMin);
-    const I = Math.max(0, Math.min(1, intensityFn(x)));
+    const I = Math.pow(Math.max(0, Math.min(1, intensityFn(x))), gamma);
     const pr = Math.round(r * I);
     const pg = Math.round(g * I);
     const pb = Math.round(b * I);
@@ -62,8 +63,9 @@ export function renderScreenStrip(ctx, width, height, intensityFn, xRange, wavel
  * @param {function} intensityFn  (r) => intensity in [0,1]
  * @param {number} rMax  maximum radial distance mapped to canvas edge
  * @param {number} wavelengthNm
+ * @param {number} [gamma=1]  display gamma — values < 1 boost dim features
  */
-export function renderAiryDisk(ctx, size, intensityFn, rMax, wavelengthNm) {
+export function renderAiryDisk(ctx, size, intensityFn, rMax, wavelengthNm, gamma = 1) {
   const { r: cr, g: cg, b: cb } = wavelengthToRGB(wavelengthNm);
   const dpr = window.devicePixelRatio || 1;
   const pxSize = Math.round(size * dpr);
@@ -77,7 +79,8 @@ export function renderAiryDisk(ctx, size, intensityFn, rMax, wavelengthNm) {
       const dy = (py - half) / half;
       const rNorm = Math.sqrt(dx * dx + dy * dy);
       const rPhys = rNorm * rMax;
-      const I = rNorm <= 1.0 ? Math.max(0, Math.min(1, intensityFn(rPhys))) : 0;
+      const raw = rNorm <= 1.0 ? Math.max(0, Math.min(1, intensityFn(rPhys))) : 0;
+      const I = Math.pow(raw, gamma);
       const idx = (py * pxSize + px) * 4;
       data[idx] = Math.round(cr * I);
       data[idx + 1] = Math.round(cg * I);

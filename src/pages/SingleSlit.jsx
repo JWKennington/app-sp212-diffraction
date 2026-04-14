@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import ControlPanel from '../components/ControlPanel';
 import Slider from '../components/Slider';
+import DisplayOptions from '../components/DisplayOptions';
 import IntensityPlot from '../components/IntensityPlot';
 import ScreenStrip from '../components/ScreenStrip';
 import Readout from '../components/Readout';
@@ -14,43 +15,50 @@ export default function SingleSlit() {
   const [a, setA] = useState(DEFAULTS.a);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
   const [L, setL] = useState(DEFAULTS.L);
+  const [lockAxis, setLockAxis] = useState(false);
+  const [gamma, setGamma] = useState(1.0);
+  const lockedRange = useRef(null);
 
   const reset = () => { setA(DEFAULTS.a); setLambda(DEFAULTS.lambda); setL(DEFAULTS.L); };
 
-  // SI units
   const a_m = a * 1e-3;
   const lambda_m = lambda * 1e-9;
 
-  // First minimum position and angle
   const y1 = (lambda_m * L) / a_m;
-  const theta1 = lambda_m / a_m; // radians
+  const theta1 = lambda_m / a_m;
 
-  // Plot x-range: show ~4 minima
-  const xMax = 4 * y1;
+  // Compute range: ~4 minima worth of data, always enough to fill the plot
+  const autoXMax = 4 * y1;
+
+  // When lock is toggled on, capture the current range
+  const handleLockAxis = (locked) => {
+    if (locked) lockedRange.current = autoXMax;
+    setLockAxis(locked);
+  };
+
+  // Use locked range if active, otherwise auto
+  const xMax = lockAxis && lockedRange.current ? lockedRange.current : autoXMax;
+  // Data always computed over a wide enough range
+  const dataXMax = Math.max(xMax, autoXMax);
   const nPts = 2000;
 
   const { xData, yData } = useMemo(() => {
     const xs = [];
     const ys = [];
     for (let i = 0; i < nPts; i++) {
-      const y = -xMax + (2 * xMax * i) / (nPts - 1);
-      xs.push(y * 1e3); // convert to mm for display
+      const y = -dataXMax + (2 * dataXMax * i) / (nPts - 1);
+      xs.push(y * 1e3);
       ys.push(singleSlitIntensity(y, a_m, lambda_m, L));
     }
     return { xData: xs, yData: ys };
-  }, [a_m, lambda_m, L, xMax]);
+  }, [a_m, lambda_m, L, dataXMax]);
 
-  const traces = useMemo(() => {
-    const trace = makeTrace(xData, yData, lambda);
-    // Minima annotations as vertical lines handled via layout shapes
-    return [trace];
-  }, [xData, yData, lambda]);
+  const traces = useMemo(() => [makeTrace(xData, yData, lambda)], [xData, yData, lambda]);
 
-  // Vertical dashed lines at first 3 minima
   const shapes = useMemo(() => {
     const s = [];
     for (let m = 1; m <= 3; m++) {
-      const pos = m * y1 * 1e3; // mm
+      const pos = m * y1 * 1e3;
       for (const sign of [1, -1]) {
         s.push({
           type: 'line',
@@ -62,6 +70,10 @@ export default function SingleSlit() {
     }
     return s;
   }, [y1]);
+
+  const xAxisRange = lockAxis && lockedRange.current
+    ? [-lockedRange.current * 1e3, lockedRange.current * 1e3]
+    : undefined;
 
   const intensityFn = useCallback(
     (y) => singleSlitIntensity(y, a_m, lambda_m, L),
@@ -78,6 +90,12 @@ export default function SingleSlit() {
           <Readout label="Central max half-width" value={(y1 * 1e3).toFixed(2)} unit="mm" />
           <Readout label="First min angle θ₁" value={(theta1 * 1e3).toFixed(3)} unit="mrad" />
         </div>
+        <DisplayOptions
+          lockAxis={lockAxis}
+          onLockAxisChange={handleLockAxis}
+          gamma={gamma}
+          onGammaChange={setGamma}
+        />
       </ControlPanel>
 
       <div className="flex-1 flex flex-col gap-4">
@@ -85,7 +103,10 @@ export default function SingleSlit() {
           <IntensityPlot
             traces={traces}
             layoutOverrides={{
-              xaxis: { title: { text: 'Screen Position y (mm)' } },
+              xaxis: {
+                title: { text: 'Screen Position y (mm)' },
+                ...(xAxisRange && { range: xAxisRange }),
+              },
               shapes,
             }}
           />
@@ -95,6 +116,7 @@ export default function SingleSlit() {
           intensityFn={intensityFn}
           xRange={[-xMax, xMax]}
           wavelengthNm={lambda}
+          gamma={gamma}
           width={800}
           height={60}
         />
