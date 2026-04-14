@@ -91,6 +91,48 @@ export default function Comparison() {
     ];
   }, [xData, yCombined, yEnv, lambda, logScale]);
 
+  // Missing orders: diffraction minima at y = m*λL/a kill interference maxima at y = n*λL/d.
+  // Missing order m occurs when m * (d/a) is an integer — i.e., interference order n = m*d/a.
+  const missingOrderShapes = useMemo(() => {
+    const shapes = [];
+    const ratio = d_m / a_m;
+    for (let m = 1; m <= 4; m++) {
+      const pos = m * y1 * 1e3; // mm, position of m-th diffraction minimum
+      const intOrder = m * ratio; // interference order at that position
+      if (Math.abs(intOrder - Math.round(intOrder)) < 0.15) {
+        // This diffraction minimum kills an interference maximum
+        for (const sign of [1, -1]) {
+          shapes.push({
+            type: 'line',
+            x0: sign * pos, x1: sign * pos,
+            y0: logScale ? -6 : 0, y1: logScale ? 0.05 : 1.05,
+            line: { color: '#C0392B', width: 1.5, dash: 'dot' },
+          });
+        }
+      }
+    }
+    return shapes;
+  }, [d_m, a_m, y1, logScale]);
+
+  const missingOrderAnnotations = useMemo(() => {
+    const annots = [];
+    const ratio = d_m / a_m;
+    for (let m = 1; m <= 4; m++) {
+      const pos = m * y1 * 1e3;
+      const intOrder = m * ratio;
+      if (Math.abs(intOrder - Math.round(intOrder)) < 0.15) {
+        annots.push({
+          x: pos, y: logScale ? -0.3 : 0.95,
+          xref: 'x', yref: 'y',
+          text: `m=${Math.round(intOrder)}`,
+          showarrow: false,
+          font: { color: '#C0392B', size: 11 },
+        });
+      }
+    }
+    return annots;
+  }, [d_m, a_m, y1, logScale]);
+
   const combinedIntensityFn = useCallback(
     (y) => doubleSlitIntensity(y, a_m, d_m, lambda_m, L),
     [a_m, d_m, lambda_m, L]
@@ -148,6 +190,8 @@ export default function Comparison() {
               xaxis: { title: { text: 'Screen Position y (mm)' }, ...(xAxisRange && { range: xAxisRange }) },
               yaxis: logScale ? { ...logYAxis, title: { text: 'Combined' } } : { title: { text: 'Combined' } },
               margin: { t: 10, b: 40 },
+              shapes: missingOrderShapes,
+              annotations: missingOrderAnnotations,
             }}
           />
         </div>
