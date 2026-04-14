@@ -1,8 +1,12 @@
 /**
- * Display options panel: lock x-axis toggle + brightness (gamma) slider.
+ * Display options panel: lock x-axis, log y-scale, brightness (gamma).
  * Sits below the main controls in the ControlPanel.
  */
-export default function DisplayOptions({ lockAxis, onLockAxisChange, gamma, onGammaChange }) {
+export default function DisplayOptions({
+  lockAxis, onLockAxisChange,
+  logScale, onLogScaleChange,
+  gamma, onGammaChange,
+}) {
   return (
     <div className="mt-5 pt-4 border-t border-usna-grid">
       <h3 className="text-usna-muted text-xs font-semibold uppercase tracking-wider mb-3">
@@ -18,6 +22,18 @@ export default function DisplayOptions({ lockAxis, onLockAxisChange, gamma, onGa
             className="accent-usna-gold w-4 h-4"
           />
           Lock x-axis range
+        </label>
+      )}
+
+      {onLogScaleChange && (
+        <label className="flex items-center gap-2 mb-3 cursor-pointer text-sm text-usna-text">
+          <input
+            type="checkbox"
+            checked={logScale}
+            onChange={(e) => onLogScaleChange(e.target.checked)}
+            className="accent-usna-gold w-4 h-4"
+          />
+          Log intensity scale
         </label>
       )}
 

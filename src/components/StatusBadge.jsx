@@ -7,7 +7,10 @@ const statusStyles = {
 export default function StatusBadge({ status, label }) {
   const style = statusStyles[status] || statusStyles.unresolved;
   return (
-    <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold border ${style}`}>
+    <span
+      className={`inline-block px-3 py-1 rounded-full text-sm font-semibold border text-center ${style}`}
+      style={{ minWidth: '14rem' }}
+    >
       {label}
     </span>
   );

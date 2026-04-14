@@ -16,7 +16,8 @@ export default function Sandbox() {
   const [d, setD] = useState(DEFAULTS.d);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
   const [lockAxis, setLockAxis] = useState(false);
-  const [gamma, setGamma] = useState(1.0);
+  const [logScale, setLogScale] = useState(false);
+  const [gamma, setGamma] = useState(0.5);
   const lockedRange = useRef(null);
 
   const reset = () => { setN(DEFAULTS.N); setA(DEFAULTS.a); setD(DEFAULTS.d); setLambda(DEFAULTS.lambda); };
@@ -49,7 +50,13 @@ export default function Sandbox() {
     return { xData: xs, yData: ys };
   }, [a_m, d_m, N, lambda_m, L, dataXMax]);
 
-  const traces = useMemo(() => [makeTrace(xData, yData, lambda)], [xData, yData, lambda]);
+  const traces = useMemo(() => {
+    if (logScale) {
+      const yLog = yData.map(v => v > 0 ? Math.log10(v) : -6);
+      return [makeTrace(xData, yLog, lambda, { fill: 'none' })];
+    }
+    return [makeTrace(xData, yData, lambda)];
+  }, [xData, yData, lambda, logScale]);
 
   const xAxisRange = lockAxis && lockedRange.current
     ? [-lockedRange.current * 1e3, lockedRange.current * 1e3]
@@ -78,6 +85,8 @@ export default function Sandbox() {
         <DisplayOptions
           lockAxis={lockAxis}
           onLockAxisChange={handleLockAxis}
+          logScale={logScale}
+          onLogScaleChange={setLogScale}
           gamma={gamma}
           onGammaChange={setGamma}
         />
@@ -92,6 +101,9 @@ export default function Sandbox() {
                 title: { text: 'Screen Position y (mm)' },
                 ...(xAxisRange && { range: xAxisRange }),
               },
+              ...(logScale && {
+                yaxis: { title: { text: 'log₁₀ Intensity' }, range: [-6, 0.05] },
+              }),
             }}
           />
         </div>

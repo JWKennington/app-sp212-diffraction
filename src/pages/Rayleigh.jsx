@@ -11,23 +11,45 @@ import { makeTrace } from '../lib/plotly';
 import { setupCanvas } from '../lib/canvas';
 import { wavelengthToRGB } from '../lib/color';
 
-const DEFAULTS = { D: 2.0, lambda: 550, sepRatio: 1.0 };
+const DEFAULTS = {
+  D: 2.0, lambda: 550, sepRatio: 1.0,
+  R: 1000, s: 0.5,
+};
 
 export default function Rayleigh() {
   const [D, setD] = useState(DEFAULTS.D);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
+
+  // Input mode: 'angle' = Δθ/θ_c ratio, 'distance' = R and s
+  const [inputMode, setInputMode] = useState('angle');
   const [sepRatio, setSepRatio] = useState(DEFAULTS.sepRatio);
+  const [R, setR] = useState(DEFAULTS.R);      // distance to sources, meters
+  const [s, setS] = useState(DEFAULTS.s);       // separation between sources, meters
+
   const [lockAxis, setLockAxis] = useState(false);
-  const [gamma, setGamma] = useState(1.0);
+  const [logScale, setLogScale] = useState(false);
+  const [gamma, setGamma] = useState(0.5);
   const lockedRange = useRef(null);
 
-  const reset = () => { setD(DEFAULTS.D); setLambda(DEFAULTS.lambda); setSepRatio(DEFAULTS.sepRatio); };
+  const reset = () => {
+    setD(DEFAULTS.D); setLambda(DEFAULTS.lambda);
+    setSepRatio(DEFAULTS.sepRatio); setR(DEFAULTS.R); setS(DEFAULTS.s);
+  };
 
   const D_m = D * 1e-3;
   const lambda_m = lambda * 1e-9;
   const thetaC = (1.22 * lambda_m) / D_m;
-  const deltaTheta = sepRatio * thetaC;
-  const L = 2.0;
+
+  // Derive angular separation from whichever mode is active
+  let deltaTheta;
+  if (inputMode === 'angle') {
+    deltaTheta = sepRatio * thetaC;
+  } else {
+    deltaTheta = s / R; // small-angle: θ ≈ s/R
+  }
+  const effectiveRatio = deltaTheta / thetaC;
+
+  const L = 2.0; // screen distance for display
   const sep = deltaTheta * L;
 
   const autoRMax = 6 * (1.22 * lambda_m * L) / D_m;
@@ -44,7 +66,7 @@ export default function Rayleigh() {
     const xs = [];
     const a1 = [];
     const a2 = [];
-    const s = [];
+    const sm = [];
     for (let i = 0; i < nPts; i++) {
       const r = -rMax + (2 * rMax * i) / (nPts - 1);
       xs.push(r * 1e3);
@@ -52,14 +74,14 @@ export default function Rayleigh() {
       const i2 = airyIntensity(r + sep / 2, D_m, lambda_m, L);
       a1.push(i1);
       a2.push(i2);
-      s.push(i1 + i2);
+      sm.push(i1 + i2);
     }
-    const maxS = Math.max(...s);
+    const maxS = Math.max(...sm);
     return {
       xData: xs,
       y1: a1.map(v => v / maxS),
       y2: a2.map(v => v / maxS),
-      ySum: s.map(v => v / maxS),
+      ySum: sm.map(v => v / maxS),
     };
   }, [D_m, lambda_m, L, sep, rMax]);
 
@@ -73,26 +95,36 @@ export default function Rayleigh() {
     return minVal;
   }, [ySum]);
 
-  const traces = useMemo(() => [
-    makeTrace(xData, ySum, lambda, { fill: 'tozeroy', line: { width: 3 } }),
-    makeTrace(xData, y1, lambda, { fill: 'none', line: { width: 1.5, dash: 'dash' }, fillcolor: 'transparent' }),
-    makeTrace(xData, y2, lambda, { fill: 'none', line: { width: 1.5, dash: 'dash' }, fillcolor: 'transparent' }),
-  ], [xData, ySum, y1, y2, lambda]);
+  const traces = useMemo(() => {
+    if (logScale) {
+      const toLog = (arr) => arr.map(v => v > 0 ? Math.log10(v) : -6);
+      return [
+        makeTrace(xData, toLog(ySum), lambda, { fill: 'none', line: { width: 3 } }),
+        makeTrace(xData, toLog(y1), lambda, { fill: 'none', line: { width: 1.5, dash: 'dash' }, fillcolor: 'transparent' }),
+        makeTrace(xData, toLog(y2), lambda, { fill: 'none', line: { width: 1.5, dash: 'dash' }, fillcolor: 'transparent' }),
+      ];
+    }
+    return [
+      makeTrace(xData, ySum, lambda, { fill: 'tozeroy', line: { width: 3 } }),
+      makeTrace(xData, y1, lambda, { fill: 'none', line: { width: 1.5, dash: 'dash' }, fillcolor: 'transparent' }),
+      makeTrace(xData, y2, lambda, { fill: 'none', line: { width: 1.5, dash: 'dash' }, fillcolor: 'transparent' }),
+    ];
+  }, [xData, ySum, y1, y2, lambda, logScale]);
 
   const xAxisRange = lockAxis && lockedRange.current
     ? [-lockedRange.current * 1e3, lockedRange.current * 1e3]
     : undefined;
 
   let status, statusLabel;
-  if (sepRatio < 0.95) {
+  if (effectiveRatio < 0.95) {
     status = 'unresolved'; statusLabel = 'Unresolved';
-  } else if (sepRatio <= 1.05) {
-    status = 'rayleigh'; statusLabel = 'Just Resolved — Rayleigh Limit';
+  } else if (effectiveRatio <= 1.05) {
+    status = 'rayleigh'; statusLabel = 'Rayleigh Limit';
   } else {
     status = 'resolved'; statusLabel = 'Well Resolved';
   }
 
-  // 2D canvas with two overlapping Airy disks
+  // 2D canvas
   const canvasRef = useRef(null);
   const size = 400;
 
@@ -136,16 +168,75 @@ export default function Rayleigh() {
       <ControlPanel onReset={reset}>
         <Slider label="Aperture diameter (D)" value={D} min={0.1} max={10.0} step={0.1} unit="mm" onChange={setD} />
         <Slider label="Wavelength (λ)" value={lambda} min={380} max={780} step={1} unit="nm" onChange={setLambda} />
-        <Slider label="Source separation (Δθ/θ_c)" value={sepRatio} min={0.2} max={3.0} step={0.05} unit="× θ_c" onChange={setSepRatio} />
+
+        {/* Input mode toggle */}
+        <div className="mt-3 mb-3">
+          <h3 className="text-usna-muted text-xs font-semibold uppercase tracking-wider mb-2">
+            Separation Input
+          </h3>
+          <div className="flex rounded overflow-hidden border border-usna-grid">
+            <button
+              onClick={() => setInputMode('angle')}
+              className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                inputMode === 'angle'
+                  ? 'bg-usna-gold text-usna-deep'
+                  : 'bg-usna-navy text-usna-text hover:text-usna-gold-light'
+              }`}
+            >
+              Angular (Δθ/θ_c)
+            </button>
+            <button
+              onClick={() => setInputMode('distance')}
+              className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                inputMode === 'distance'
+                  ? 'bg-usna-gold text-usna-deep'
+                  : 'bg-usna-navy text-usna-text hover:text-usna-gold-light'
+              }`}
+            >
+              Distance (R, s)
+            </button>
+          </div>
+        </div>
+
+        {inputMode === 'angle' ? (
+          <Slider
+            label="Source separation (Δθ/θ_c)"
+            value={sepRatio}
+            min={0.2} max={3.0} step={0.05}
+            unit="× θ_c"
+            onChange={setSepRatio}
+          />
+        ) : (
+          <>
+            <Slider
+              label="Distance to sources (R)"
+              value={R}
+              min={1} max={100000} step={1}
+              unit="m"
+              onChange={setR}
+            />
+            <Slider
+              label="Source separation (s)"
+              value={s}
+              min={0.001} max={100} step={0.001}
+              unit="m"
+              onChange={setS}
+            />
+          </>
+        )}
+
         <div className="mt-4 space-y-2">
           <StatusBadge status={status} label={statusLabel} />
           <Readout label="θ_c" value={(thetaC * 1e3).toFixed(4)} unit="mrad" />
           <Readout label="Δθ" value={(deltaTheta * 1e3).toFixed(4)} unit="mrad" />
+          <Readout label="Δθ / θ_c" value={effectiveRatio.toFixed(3)} unit="" />
           <Readout label="Dip depth" value={(dipDepth * 100).toFixed(1)} unit="%" />
         </div>
         <DisplayOptions
           lockAxis={lockAxis}
           onLockAxisChange={handleLockAxis}
+          logScale={logScale}
+          onLogScaleChange={setLogScale}
           gamma={gamma}
           onGammaChange={setGamma}
         />
@@ -160,6 +251,9 @@ export default function Rayleigh() {
                 title: { text: 'Screen Position (mm)' },
                 ...(xAxisRange && { range: xAxisRange }),
               },
+              ...(logScale && {
+                yaxis: { title: { text: 'log₁₀ Intensity' }, range: [-6, 0.05] },
+              }),
             }}
           />
         </div>
@@ -175,7 +269,7 @@ export default function Rayleigh() {
         <InfoPanel
           title="Rayleigh Criterion"
           description="Two point sources are 'just resolved' when the central maximum of one Airy pattern falls on the first dark ring of the other. At this limit, the combined intensity dip between the peaks is about 74% of the maximum."
-          equation={String.raw`\theta_c = 1.22\,\frac{\lambda}{D}`}
+          equation={String.raw`\theta_c = 1.22\,\frac{\lambda}{D}, \qquad \theta \approx \frac{s}{R}`}
         />
       </div>
     </div>

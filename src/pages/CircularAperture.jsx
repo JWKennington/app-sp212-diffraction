@@ -16,7 +16,8 @@ export default function CircularAperture() {
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
   const [L, setL] = useState(DEFAULTS.L);
   const [lockAxis, setLockAxis] = useState(false);
-  const [gamma, setGamma] = useState(1.0);
+  const [logScale, setLogScale] = useState(false);
+  const [gamma, setGamma] = useState(0.5);
   const lockedRange = useRef(null);
 
   const reset = () => { setD(DEFAULTS.D); setLambda(DEFAULTS.lambda); setL(DEFAULTS.L); };
@@ -49,17 +50,23 @@ export default function CircularAperture() {
     return { xData: xs, yData: ys };
   }, [D_m, lambda_m, L, dataRMax]);
 
-  const traces = useMemo(() => [makeTrace(xData, yData, lambda)], [xData, yData, lambda]);
+  const traces = useMemo(() => {
+    if (logScale) {
+      const yLog = yData.map(v => v > 0 ? Math.log10(v) : -6);
+      return [makeTrace(xData, yLog, lambda, { fill: 'none' })];
+    }
+    return [makeTrace(xData, yData, lambda)];
+  }, [xData, yData, lambda, logScale]);
 
   const shapes = useMemo(() => {
     const pos = r1 * 1e3;
     return [1, -1].map(sign => ({
       type: 'line',
       x0: sign * pos, x1: sign * pos,
-      y0: 0, y1: 1.05,
+      y0: logScale ? -6 : 0, y1: logScale ? 0.05 : 1.05,
       line: { color: '#C5B783', width: 1, dash: 'dash' },
     }));
-  }, [r1]);
+  }, [r1, logScale]);
 
   const xAxisRange = lockAxis && lockedRange.current
     ? [-lockedRange.current * 1e3, lockedRange.current * 1e3]
@@ -83,6 +90,8 @@ export default function CircularAperture() {
         <DisplayOptions
           lockAxis={lockAxis}
           onLockAxisChange={handleLockAxis}
+          logScale={logScale}
+          onLogScaleChange={setLogScale}
           gamma={gamma}
           onGammaChange={setGamma}
         />
@@ -97,6 +106,9 @@ export default function CircularAperture() {
                 title: { text: 'Radial Position r (mm)' },
                 ...(xAxisRange && { range: xAxisRange }),
               },
+              ...(logScale && {
+                yaxis: { title: { text: 'log₁₀ Intensity' }, range: [-6, 0.05] },
+              }),
               shapes,
             }}
           />

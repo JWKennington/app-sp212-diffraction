@@ -16,7 +16,8 @@ export default function SingleSlit() {
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
   const [L, setL] = useState(DEFAULTS.L);
   const [lockAxis, setLockAxis] = useState(false);
-  const [gamma, setGamma] = useState(1.0);
+  const [logScale, setLogScale] = useState(false);
+  const [gamma, setGamma] = useState(0.5);
   const lockedRange = useRef(null);
 
   const reset = () => { setA(DEFAULTS.a); setLambda(DEFAULTS.lambda); setL(DEFAULTS.L); };
@@ -27,18 +28,14 @@ export default function SingleSlit() {
   const y1 = (lambda_m * L) / a_m;
   const theta1 = lambda_m / a_m;
 
-  // Compute range: ~4 minima worth of data, always enough to fill the plot
   const autoXMax = 4 * y1;
 
-  // When lock is toggled on, capture the current range
   const handleLockAxis = (locked) => {
     if (locked) lockedRange.current = autoXMax;
     setLockAxis(locked);
   };
 
-  // Use locked range if active, otherwise auto
   const xMax = lockAxis && lockedRange.current ? lockedRange.current : autoXMax;
-  // Data always computed over a wide enough range
   const dataXMax = Math.max(xMax, autoXMax);
   const nPts = 2000;
 
@@ -53,7 +50,13 @@ export default function SingleSlit() {
     return { xData: xs, yData: ys };
   }, [a_m, lambda_m, L, dataXMax]);
 
-  const traces = useMemo(() => [makeTrace(xData, yData, lambda)], [xData, yData, lambda]);
+  const traces = useMemo(() => {
+    if (logScale) {
+      const yLog = yData.map(v => v > 0 ? Math.log10(v) : -6);
+      return [makeTrace(xData, yLog, lambda, { fill: 'none' })];
+    }
+    return [makeTrace(xData, yData, lambda)];
+  }, [xData, yData, lambda, logScale]);
 
   const shapes = useMemo(() => {
     const s = [];
@@ -63,13 +66,13 @@ export default function SingleSlit() {
         s.push({
           type: 'line',
           x0: sign * pos, x1: sign * pos,
-          y0: 0, y1: 1.05,
+          y0: logScale ? -6 : 0, y1: logScale ? 0.05 : 1.05,
           line: { color: '#C5B783', width: 1, dash: 'dash' },
         });
       }
     }
     return s;
-  }, [y1]);
+  }, [y1, logScale]);
 
   const xAxisRange = lockAxis && lockedRange.current
     ? [-lockedRange.current * 1e3, lockedRange.current * 1e3]
@@ -93,6 +96,8 @@ export default function SingleSlit() {
         <DisplayOptions
           lockAxis={lockAxis}
           onLockAxisChange={handleLockAxis}
+          logScale={logScale}
+          onLogScaleChange={setLogScale}
           gamma={gamma}
           onGammaChange={setGamma}
         />
@@ -107,6 +112,9 @@ export default function SingleSlit() {
                 title: { text: 'Screen Position y (mm)' },
                 ...(xAxisRange && { range: xAxisRange }),
               },
+              ...(logScale && {
+                yaxis: { title: { text: 'log₁₀ Intensity' }, range: [-6, 0.05] },
+              }),
               shapes,
             }}
           />

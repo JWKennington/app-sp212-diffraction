@@ -16,7 +16,8 @@ export default function Comparison() {
   const [d, setD] = useState(DEFAULTS.d);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
   const [lockAxis, setLockAxis] = useState(false);
-  const [gamma, setGamma] = useState(1.0);
+  const [logScale, setLogScale] = useState(false);
+  const [gamma, setGamma] = useState(0.5);
   const lockedRange = useRef(null);
 
   const reset = () => { setA(DEFAULTS.a); setD(DEFAULTS.d); setLambda(DEFAULTS.lambda); };
@@ -60,25 +61,34 @@ export default function Comparison() {
     ? [-lockedRange.current * 1e3, lockedRange.current * 1e3]
     : undefined;
 
-  const interfTraces = useMemo(() => [
-    makeTrace(xData, yInterf, lambda, { fill: 'tozeroy' }),
-  ], [xData, yInterf, lambda]);
+  const toLog = (arr) => arr.map(v => v > 0 ? Math.log10(v) : -6);
+  const logYAxis = { title: { text: 'log₁₀ Intensity' }, range: [-6, 0.05] };
 
-  const envTraces = useMemo(() => [
-    makeTrace(xData, yEnv, lambda, { fill: 'tozeroy' }),
-  ], [xData, yEnv, lambda]);
+  const interfTraces = useMemo(() => {
+    const y = logScale ? toLog(yInterf) : yInterf;
+    return [makeTrace(xData, y, lambda, { fill: logScale ? 'none' : 'tozeroy' })];
+  }, [xData, yInterf, lambda, logScale]);
 
-  const combinedTraces = useMemo(() => [
-    makeTrace(xData, yCombined, lambda, { fill: 'tozeroy' }),
-    {
-      x: xData,
-      y: yEnv,
-      type: 'scatter',
-      mode: 'lines',
-      line: { color: '#C5B783', width: 2, dash: 'dash' },
-      fill: 'none',
-    },
-  ], [xData, yCombined, yEnv, lambda]);
+  const envTraces = useMemo(() => {
+    const y = logScale ? toLog(yEnv) : yEnv;
+    return [makeTrace(xData, y, lambda, { fill: logScale ? 'none' : 'tozeroy' })];
+  }, [xData, yEnv, lambda, logScale]);
+
+  const combinedTraces = useMemo(() => {
+    const yC = logScale ? toLog(yCombined) : yCombined;
+    const yE = logScale ? toLog(yEnv) : yEnv;
+    return [
+      makeTrace(xData, yC, lambda, { fill: logScale ? 'none' : 'tozeroy' }),
+      {
+        x: xData,
+        y: yE,
+        type: 'scatter',
+        mode: 'lines',
+        line: { color: '#C5B783', width: 2, dash: 'dash' },
+        fill: 'none',
+      },
+    ];
+  }, [xData, yCombined, yEnv, lambda, logScale]);
 
   const combinedIntensityFn = useCallback(
     (y) => doubleSlitIntensity(y, a_m, d_m, lambda_m, L),
@@ -100,6 +110,8 @@ export default function Comparison() {
         <DisplayOptions
           lockAxis={lockAxis}
           onLockAxisChange={handleLockAxis}
+          logScale={logScale}
+          onLogScaleChange={setLogScale}
           gamma={gamma}
           onGammaChange={setGamma}
         />
@@ -111,7 +123,7 @@ export default function Comparison() {
             traces={interfTraces}
             layoutOverrides={{
               xaxis: { title: { text: '' }, ...(xAxisRange && { range: xAxisRange }) },
-              yaxis: { title: { text: 'Interference' } },
+              yaxis: logScale ? { ...logYAxis, title: { text: 'Interference' } } : { title: { text: 'Interference' } },
               margin: { t: 10, b: 25 },
             }}
           />
@@ -122,7 +134,7 @@ export default function Comparison() {
             traces={envTraces}
             layoutOverrides={{
               xaxis: { title: { text: '' }, ...(xAxisRange && { range: xAxisRange }) },
-              yaxis: { title: { text: 'Envelope' } },
+              yaxis: logScale ? { ...logYAxis, title: { text: 'Envelope' } } : { title: { text: 'Envelope' } },
               margin: { t: 10, b: 25 },
             }}
           />
@@ -133,7 +145,7 @@ export default function Comparison() {
             traces={combinedTraces}
             layoutOverrides={{
               xaxis: { title: { text: 'Screen Position y (mm)' }, ...(xAxisRange && { range: xAxisRange }) },
-              yaxis: { title: { text: 'Combined' } },
+              yaxis: logScale ? { ...logYAxis, title: { text: 'Combined' } } : { title: { text: 'Combined' } },
               margin: { t: 10, b: 40 },
             }}
           />
