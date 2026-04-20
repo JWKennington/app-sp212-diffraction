@@ -16,12 +16,35 @@ export default function Sandbox() {
   const [a, setA] = useState(DEFAULTS.a);
   const [d, setD] = useState(DEFAULTS.d);
   const [lambda, setLambda] = useState(DEFAULTS.lambda);
+  const [lockRatio, setLockRatio] = useState(false);
   const [lockAxis, setLockAxis] = useState(true);
   const [logScale, setLogScale] = useState(false);
   const [gamma, setGamma] = useState(0.5);
   const lockedRange = useRef(INITIAL_RANGE);
+  const ratioRef = useRef(DEFAULTS.d / DEFAULTS.a);
 
-  const reset = () => { setN(DEFAULTS.N); setA(DEFAULTS.a); setD(DEFAULTS.d); setLambda(DEFAULTS.lambda); };
+  const handleLockRatio = (checked) => {
+    if (checked) ratioRef.current = d / a;
+    setLockRatio(checked);
+  };
+
+  const handleA = (newA) => {
+    setA(newA);
+    if (lockRatio) {
+      const newD = Math.round(newA * ratioRef.current * 100) / 100;
+      setD(Math.min(2.0, Math.max(0.1, newD)));
+    }
+  };
+
+  const handleD = (newD) => {
+    setD(newD);
+    if (lockRatio) {
+      const newA = Math.round((newD / ratioRef.current) * 100) / 100;
+      setA(Math.min(0.50, Math.max(0.01, newA)));
+    }
+  };
+
+  const reset = () => { setN(DEFAULTS.N); setA(DEFAULTS.a); setD(DEFAULTS.d); setLambda(DEFAULTS.lambda); setLockRatio(false); };
 
   const a_m = a * 1e-3;
   const d_m = d * 1e-3;
@@ -80,8 +103,17 @@ export default function Sandbox() {
     <div className="flex flex-col lg:flex-row gap-6">
       <ControlPanel onReset={reset}>
         <Slider label="Number of slits (N)" value={N} min={1} max={20} step={1} unit="" onChange={setN} />
-        <Slider label="Slit width (a)" value={a} min={0.01} max={0.50} step={0.01} unit="mm" onChange={setA} />
-        <Slider label="Slit separation (d)" value={d} min={0.1} max={2.0} step={0.01} unit="mm" onChange={setD} />
+        <Slider label="Slit width (a)" value={a} min={0.01} max={0.50} step={0.01} unit="mm" onChange={handleA} />
+        <Slider label="Slit separation (d)" value={d} min={0.1} max={2.0} step={0.01} unit="mm" onChange={handleD} />
+        <label className="flex items-center gap-2 text-sm text-usna-text mb-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={lockRatio}
+            onChange={(e) => handleLockRatio(e.target.checked)}
+            className="accent-usna-gold w-4 h-4"
+          />
+          Lock d/a = {(d / a).toFixed(1)}
+        </label>
         <Slider label="Wavelength (λ)" value={lambda} min={380} max={780} step={1} unit="nm" onChange={setLambda} />
         <DisplayOptions
           lockAxis={lockAxis}
