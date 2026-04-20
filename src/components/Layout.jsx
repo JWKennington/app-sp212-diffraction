@@ -6,6 +6,7 @@ const links = [
   { to: '/rayleigh', label: 'Rayleigh Criterion' },
   { to: '/comparison', label: 'Double vs. Single' },
   { to: '/sandbox', label: 'N-Slit Sandbox' },
+  { to: '/phasors', label: 'Phasors' },
 ];
 
 export default function Layout({ children }) {

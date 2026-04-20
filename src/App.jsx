@@ -5,6 +5,7 @@ import CircularAperture from './pages/CircularAperture';
 import Rayleigh from './pages/Rayleigh';
 import Comparison from './pages/Comparison';
 import Sandbox from './pages/Sandbox';
+import Phasors from './pages/Phasors';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/rayleigh" element={<Rayleigh />} />
         <Route path="/comparison" element={<Comparison />} />
         <Route path="/sandbox" element={<Sandbox />} />
+        <Route path="/phasors" element={<Phasors />} />
       </Routes>
     </Layout>
   );
